@@ -1,0 +1,44 @@
+let productTable = base.getTable('Product Backlog') //replace your table name for Unified Product Backlog here
+let teamMembersTable = base.getTable('Team Members/Squads') // replace your Team Members board here
+
+let backlogQuery = await productTable.selectRecordsAsync(({
+        sorts: [
+        // sort by "Description" in ascending order
+        {field: "Last Updated"},
+        ]
+    }))
+let teamQuery = await teamMembersTable.selectRecordsAsync()
+
+// look at the imagine I sent you and add the input variables from the webhook
+
+let inputConfig = input.config();
+let key = inputConfig.key;
+let assignee = inputConfig.assignee;
+let updateArray = []
+let successCheck;
+
+try {
+    for (let rec of backlogQuery.records) {
+        if (rec.getCellValueAsString('Key')== key) {
+            for (let teamMember of teamQuery.records) {
+                if (teamMember.getCellValueAsString('Name') == assignee) {
+                    let updateRec = {id: rec.id, fields: {"Assignee": [{ id: teamMember.id }]}}
+                    updateArray.push(updateRec)
+                    successCheck = true;
+                    break;
+                }
+            }
+            if (successCheck != true) {
+                throw new Error("Can't find someone whose name is " + assignee + " on the Team Members board.");
+            }
+            break;
+        }
+    }
+} catch(e) {
+    throw new Error("Can't find someone whose name is " + assignee + " on the Team Members board.");
+}
+
+while (updateArray.length > 0) {
+    await productTable.updateRecordsAsync(updateArray.slice(0, 50));
+    updateArray = updateArray.slice(50);
+}
